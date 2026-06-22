@@ -45,6 +45,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 BUILD_INFO_PATH = REPO_ROOT / "studio" / "backend" / "utils" / "_studio_release_build.py"
 BUILD_INFO_SUFFIX = "studio/backend/utils/_studio_release_build.py"
 VERSION_RE = re.compile(r"^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.][0-9A-Za-z.-]*)?$")
+RELEASE_ASSIGNMENT_RE = re.compile(
+    r"^STUDIO_RELEASE_VERSION\s*=\s*['\"]([^'\"]+)['\"]\s*$",
+    re.MULTILINE,
+)
 GIT_DESCRIBE_SUFFIX_RE = re.compile(r"-\d+-g[0-9A-Fa-f]+(?:-dirty)?$")
 MAX_VERSION_LENGTH = 64
 PLACEHOLDER = """# SPDX-License-Identifier: AGPL-3.0-only
@@ -232,7 +236,7 @@ def _read_sdist_member(path: Path) -> str | None:
 
 
 def _extract_studio_release_version(content: str) -> str | None:
-    match = re.search(r"^STUDIO_RELEASE_VERSION\s*=\s*['\"]([^'\"]+)['\"]\s*$", content, re.MULTILINE)
+    match = RELEASE_ASSIGNMENT_RE.search(content)
     if not match:
         return None
     return match.group(1).strip()
