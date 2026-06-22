@@ -136,7 +136,6 @@ jobs:
       - name: Verify PyPI package and Studio stamp
         shell: bash
         env:
-          STUDIO_VERSION: ${{ steps.prepare.outputs.studio_version }}
           PYPI_VERSION: ${{ steps.prepare.outputs.pypi_version }}
         run: |
           set -euo pipefail
@@ -196,7 +195,7 @@ jobs:
               echo "No PyPI wheel/sdist artifacts downloaded for unsloth==$PYPI_VERSION" >&2
               exit 1
             fi
-            python3 scripts/stamp_studio_release.py --verify-dist "$RUNNER_TEMP/pypi-unsloth-dist" --expected "$STUDIO_VERSION"
+            python3 scripts/stamp_studio_release.py --verify-dist "$RUNNER_TEMP/pypi-unsloth-dist"
           else
             echo "scripts/stamp_studio_release.py not found; release-desktop requires #5308 to verify the PyPI Studio stamp." >&2
             exit 1

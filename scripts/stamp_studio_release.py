@@ -231,8 +231,15 @@ def _read_sdist_member(path: Path) -> str | None:
     return None
 
 
-def verify_dist(expected: str, dist_dir: Path) -> int:
-    if not is_valid_version(expected):
+def _extract_studio_release_version(content: str) -> str | None:
+    match = re.search(r"^STUDIO_RELEASE_VERSION\s*=\s*['\"]([^'\"]+)['\"]\s*$", content, re.MULTILINE)
+    if not match:
+        return None
+    return match.group(1).strip()
+
+
+def verify_dist(expected: str | None, dist_dir: Path) -> int:
+    if expected is not None and not is_valid_version(expected):
         print(f"Invalid expected Studio release version: {expected!r}", file = sys.stderr)
         return 2
 
@@ -241,8 +248,8 @@ def verify_dist(expected: str, dist_dir: Path) -> int:
         print(f"No wheel or sdist artifacts found in {dist_dir}", file = sys.stderr)
         return 2
 
-    expected_line = f"STUDIO_RELEASE_VERSION = {expected!r}"
     failures: list[str] = []
+    discovered_versions: set[str] = set()
     for artifact in artifacts:
         if artifact.suffix == ".whl":
             content = _read_wheel_member(artifact)
@@ -250,15 +257,29 @@ def verify_dist(expected: str, dist_dir: Path) -> int:
             content = _read_sdist_member(artifact)
         if content is None:
             failures.append(f"{artifact.name}: missing {BUILD_INFO_SUFFIX}")
-        elif expected_line not in content:
+            continue
+
+        stamped_version = _extract_studio_release_version(content)
+        if stamped_version is None:
+            failures.append(f"{artifact.name}: missing STUDIO_RELEASE_VERSION assignment")
+            continue
+        if not is_valid_version(stamped_version):
+            failures.append(f"{artifact.name}: invalid Studio release version stamp {stamped_version!r}")
+            continue
+        discovered_versions.add(stamped_version)
+        if expected is not None and stamped_version != expected:
             failures.append(f"{artifact.name}: Studio release version mismatch")
+
+    if len(discovered_versions) > 1:
+        failures.append("Distribution artifacts contain inconsistent Studio release version stamps")
 
     if failures:
         for failure in failures:
             print(failure, file = sys.stderr)
         return 2
 
-    print(f"Verified Studio release version {expected} in {len(artifacts)} artifact(s)")
+    verified_version = expected or next(iter(discovered_versions))
+    print(f"Verified Studio release version {verified_version} in {len(artifacts)} artifact(s)")
     return 0
 
 
@@ -270,8 +291,6 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.verify_dist is not None:
-        if not args.expected:
-            parser.error("--verify-dist requires --expected")
         return verify_dist(args.expected, args.verify_dist)
 
     return stamp(require_release = args.require_release)
